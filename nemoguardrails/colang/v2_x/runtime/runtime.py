@@ -522,6 +522,7 @@ class RuntimeV2_x(Runtime):
                             name="ColangError",
                             arguments={
                                 "type": str(type(e).__name__),
+                                "msg": "",
                                 "error": str(e),
                             },
                         )

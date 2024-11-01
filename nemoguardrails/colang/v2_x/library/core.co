@@ -222,7 +222,7 @@ flow debugging helpers
 flow warning of colang errors
   """Print and log warning about runtime Colang errors."""
   match ColangError() as $event
-  $info = "Colang error: {$event.type} - {escape($event.error)}"
+  $info = "Colang error: {$event.msg} - {$event.type} - {escape($event.error)}"
   log $info
 
 flow warning of undefined flow start
@@ -282,6 +282,21 @@ flow observation of flow failed $flow_name
 flow wait indefinitely
   """Little helper flow to wait indefinitely."""
   match NeverComingEvent()
+
+flow start_flow_by_name $flow_name $new_flow_instance_uid = None
+  """Start a flow with the provided name."""
+  if $new_flow_instance_uid is None
+    $new_flow_instance_uid = "({$flow_name}){uid()}"
+  send StartFlow(flow_id=$flow_name, flow_instance_uid=$new_flow_instance_uid)
+  match FlowStarted(flow_id=$flow_name, flow_instance_uid=$new_flow_instance_uid) as $event_ref
+
+flow stop_flow_by_name $flow_name
+  """Stop a flow with the provided name."""
+  send StopFlow(flow_id=$flow_name, deactivate=False)
+
+flow deactivate_flow_by_name $flow_name
+  """Deactivate a flow with the provided name."""
+  send StopFlow(flow_id=$flow_name, deactivate=True)
 
 flow await_flow_by_name $flow_name $new_flow_instance_uid = None
   """Start a flow with the provided name and wait for it to finish."""
