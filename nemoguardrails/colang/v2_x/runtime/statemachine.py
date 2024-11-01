@@ -952,11 +952,10 @@ def _advance_head_front(state: State, heads: List[FlowHead]) -> List[FlowHead]:
             element = flow_config.elements[head.position]
             if hasattr(element, "_source") and element._source:
                 source_line = str(element._source.line)
+            message = f"Flow '{flow_state.flow_id}' failed on line {source_line} ({flow_config.source_file})"
             log.warning(
-                "Flow '%s' failed on line %s (%s) due to Colang runtime exception: %s",
-                flow_state.flow_id,
-                source_line,
-                flow_config.source_file,
+                "%s due to Colang runtime exception: %s",
+                message,
                 e,
                 exc_info=True,
             )
@@ -964,6 +963,7 @@ def _advance_head_front(state: State, heads: List[FlowHead]) -> List[FlowHead]:
                 name="ColangError",
                 arguments={
                     "type": str(type(e).__name__),
+                    "msg": message,
                     "error": str(e),
                 },
             )
@@ -1914,6 +1914,7 @@ def _compute_event_matching_score(
     state: State, flow_state: FlowState, head: FlowHead, event: Event
 ) -> float:
     """Check if the element matches with given event."""
+
     element = get_element_from_head(state, head)
     assert (
         element is not None
@@ -1925,7 +1926,34 @@ def _compute_event_matching_score(
     if not isinstance(ref_event, type(event)):
         return 0.0
 
-    return _compute_event_comparison_score(state, event, ref_event, flow_state.priority)
+    try:
+        return _compute_event_comparison_score(
+            state, event, ref_event, flow_state.priority
+        )
+
+    except Exception as e:
+        # In case there were any runtime error the flow will be aborted (fail)
+        source_line = "unknown"
+        flow_config = state.flow_configs[flow_state.flow_id]
+        if hasattr(element, "_source") and element._source:
+            source_line = str(element._source.line)
+        message = f"Flow '{flow_state.flow_id}' failed on line {source_line} ({flow_config.source_file})"
+        log.warning(
+            "%s due to Colang runtime exception: %s",
+            message,
+            e,
+            exc_info=True,
+        )
+        colang_error_event = Event(
+            name="ColangError",
+            arguments={
+                "type": str(type(e).__name__),
+                "msg": message,
+                "error": str(e),
+            },
+        )
+        _push_internal_event(state, colang_error_event)
+        return 0.0
 
 
 def _compute_event_comparison_score(
